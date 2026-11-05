@@ -213,7 +213,7 @@ local S = {
 	DigMult = 1.3,     -- 1.4+ เซิร์ฟตีตก (เส้นแบ่ง 24-25 วิ/กอง)
 	TrashSearch = 80,
 	AutoSell = true, SellEvery = 4,   -- ฟาร์มครบกี่กองแล้วเดินไปขายให้ NPC
-	AutoTrash = false, AutoCandy = false, LowGfx = true, FpsUnlock = true,   -- จำข้ามรอบรัน | LowGfx/FpsUnlock เปิดอัตโนมัติตอนรัน
+	AutoTrash = false, AutoCandy = false, LowGfx = false, FpsUnlock = false,   -- จำข้ามรอบรัน | LowGfx/FpsUnlock เปิดอัตโนมัติตอนรัน
 	SellPick = {},     -- ไอเท็มที่จะขาย (ติก) ว่างหรือไม่มีเลย = ขายหมด; มีบางตัว = ขายเฉพาะที่ติก
 }
 --========================= จำค่า (CONFIG PERSISTENCE) =========================
@@ -243,10 +243,19 @@ if S.CfgVer < 2 then S.CfgVer, S.ReloadMul, S.EquipMul = 2, 0.4, 0.1 end
 -- CfgVer 3: ดัน EspHz จาก 30 เป็น 60 ครั้งเดียว — 30 ครั้ง/วิ บนจอ 60fps = กรอบขยับเฟรมเว้นเฟรม เห็นเป็นกรอบว่ายตามตัวตอนหันจอ (ชัดมากบนมือถือที่ปัดนิ้วหันเร็ว)
 -- ถ้า fps ตก ลดเองได้ที่สไลเดอร์ "อัตราวาด" แล้วค่าที่ลดจะถูกจำ ไม่ถูกดันขึ้นอีก
 if S.CfgVer < 3 then S.CfgVer, S.EspHz = 3, 60 end
+-- CfgVer 4: กราฟิกต่ำ/ปลดล็อก FPS ไม่เปิดเองตอนรันแล้ว (ค่าเก่าในเซฟถูกบังคับให้เปิดมาตลอด) รีเซ็ตเป็นปิดครั้งเดียว หลังจากนี้ใครเปิดไว้ก็จำค่านั้นข้ามรอบ
+if S.CfgVer < 4 then S.CfgVer, S.LowGfx, S.FpsUnlock = 4, false, false end
 S.ReloadMul, S.EquipMul = math.clamp(S.ReloadMul, 0.2, 1), math.clamp(S.EquipMul, 0.1, 1)
 S.FireMul = math.clamp(S.FireMul, 0.1, 1)   -- ปรับได้จากสไลเดอร์ "ความรัวปืน" ในแท็บปืน
 S.MaxCPS = math.max(S.MaxCPS, 40)   -- 0.4 → 0.6: ปืนช้า (Double Barrel 0.43) เคยถูกเร่งเป็น 0.17 = 2.5 เท่าของปืนจริง
 S.FireFloor = 0.03
+-- ตรึงค่าที่ซ่อนจากเมนู (ไม่มีสวิตช์แล้ว ค่าเก่าในไฟล์เซฟต้องไม่ค้างมาแทน): เล็ง NPC ปิด | Triggerbot รัวเป็นชุด เปิด | ปิดคลิกเอง ปิด | ล็อกค้างถึง 200
+-- (ค่าพื้นฐานเดิมของสคริปต์ทั้งหมด ตัวทำงานไม่ได้ถูกแตะ) | อยากเปลี่ยนค่าไหนแก้ตรงนี้ที่เดียว
+S.AimNPC, S.TrigSpray, S.TrigOnly, S.StickFovPx = false, true, false, 200
+-- ซ่อนเพิ่ม: ตำรวจ ★ ผู้ต้องหา เปิด | กระสุนเกาะกลุ่ม เปิด | ไม่ร้อน เปิด | ไม่มีรีคอยล์ เปิด | ตัดเสียงรีโหลด เปิด (ค่าพื้นฐานเดิมทั้งหมด)
+S.WantedEsp, S.NoSpread, S.NoHeat, S.NoRecoil, S.MuteReload = true, true, true, true, true
+-- ซ่อนแท็บปืนเพิ่ม: ระยะเชื่อถือได้ = อัตโนมัติ (ล้างค่าที่เคยตั้งเองในเซฟ) | ฟันมีดเร็วขึ้น เปิด 40% | ปรับความรัวอัตโนมัติ เปิด | ท่าแลคกระตุกตอนปกติ ปิด (ลบออก)
+S.GunRange, S.MeleeFast, S.MeleePct, S.AutoRate, S.LagStyle = {}, true, 40, true, false
 -- เดินปกติ = 8, วิ่ง (sprint) ของเกม = 18 (วัดจริง) | ทดสอบ 31/10: ความเร็วตายตัวผ่านถึง 26, โดนเตะที่ 30 (Anti System 25)
 -- SpeedCap = ความเร็วรวมสูงสุดไม่ว่าเดิน/วิ่ง (เผื่อขอบ 2 จาก 26) | SpeedMax = ค่าบวกสูงสุดของสไลเดอร์ (ฐานเดิน 8 + 16 = 24)
 local SpeedCap, SpeedMax = 24, 16
@@ -2493,7 +2502,7 @@ local function Section(label)
 			swg.Enabled=state; sw.BackgroundColor3=state and C.cyan or C.off
 			knob.Position=state and UDim2.new(1,-21,0.5,-9) or UDim2.new(0,3,0.5,-9)
 		end
-		paint(); sw.MouseButton1Click:Connect(function() state=not state paint() cb(state) end)
+		paint(); sw.MouseButton1Click:Connect(function() state=not state paint() cb(state) pcall(saveCfg) end)   -- บันทึกค่าทันทีที่กด (เดิมรอลูป 3 วิ ปิดเกมเร็วค่าหาย)
 		return { set=function(v) state=v paint() end }
 	end
 	function api.slider(label,mn,mx,inc,init,cb)
@@ -2517,7 +2526,7 @@ local function Section(label)
 		end
 		track.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=true setFromX(i.Position.X) end end)
 		UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then setFromX(i.Position.X) end end)
-		UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end end)
+		UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then if drag then drag=false pcall(saveCfg) end end end)
 		return { set=function(v) cur=v paint() end }
 	end
 	function api.button(label,cb)
@@ -2572,19 +2581,16 @@ sAim.toggle("SilentAim (หัวเท่านั้น)", S.AimOn, function(v
 sAim.toggle("แสดงวง FOV", S.ShowFov, function(v) S.ShowFov=v end)
 sAim.toggle("วง FOV ตามเมาส์ (ปิด = กลางจอ)", S.FovFollow, function(v) S.FovFollow=v lockChar=nil end)
 sAim.toggle("ไม่ยิงเพื่อนทีม", S.TeamCheck, function(v) S.TeamCheck=v lockChar=nil end)
-sAim.toggle("เล็ง NPC ด้วย (ตำรวจ/คนเดินถนน)", S.AimNPC, function(v) S.AimNPC=v lockChar=nil end)
+-- ซ่อนจากเมนู (ตามสั่ง): เล็ง NPC / Triggerbot รัวเป็นชุด / ปิดคลิกเอง — ตัวทำงานยังอยู่ครบ ค่าถูกตรึงไว้ที่หัวไฟล์ (บล็อก "ตรึงค่าที่ซ่อน")
 sAim.toggle("Triggerbot (ยิงเองเมื่อล็อกเป้า)", S.Trigger, function(v) S.Trigger=v end)
-sAim.toggle("Triggerbot รัวเป็นชุดเสมอ (ไม่รอเป้านิ่ง)", S.TrigSpray, function(v) S.TrigSpray=v end)
 sAim.toggle("กดเมาส์ซ้ายค้าง = ยิงรัวต่อเนื่อง", S.HoldSpray, function(v) S.HoldSpray=v end)
 sAim.slider("กดค้างยิงรัวได้นานสุด (วินาที/ครั้ง)", 0.5, 5, 0.25, S.HoldMax, function(v) S.HoldMax=v end)
 sAim.toggle("หมอบ (C) แล้วยังถือปืนได้", S.CrouchKeep, function(v) S.CrouchKeep=v end)
-sAim.toggle("ปิดคลิกเอง (ให้ Triggerbot ยิงอย่างเดียว)", S.TrigOnly, function(v) S.TrigOnly=v end)
 sAim.slider("คลิกสูงสุดต่อวินาที (กันโดนเตะ)", 3, 10, 1, S.MaxCPS, function(v) S.MaxCPS=v end)
 sAim.slider("มุมเบี่ยงกระสุนสูงสุด (องศา) ยิ่งน้อยยิ่งเนียน", 1, 12, 1, S.AimAngle, function(v) S.AimAngle=v lockChar=nil end)
 sAim.slider("ขนาดวง FOV", 40, 600, 10, S.FovPx, function(v) S.FovPx=v end)
-sAim.slider("ล็อกค้างถึง", 60, 900, 10, S.StickFovPx, function(v) S.StickFovPx=v end)
+-- ซ่อนจากเมนู: สไลเดอร์ "ล็อกค้างถึง" (ตรึง 200) และ dropdown "เป้าหมาย" (เล็งศีรษะอย่างเดียวอยู่แล้ว)
 sAim.slider("ระยะล็อก", 50, 1500, 25, S.MaxDist, function(v) S.MaxDist=v end)
-sAim.dropdown("เป้าหมาย", {"ศีรษะ"}, "ศีรษะ", function(_) end)  -- เล็งหัวอย่างเดียว (คงเดิม)
 
 local sEsp = Section("👤 ESP ผู้เล่น")
 sEsp.toggle("เปิด ESP", S.EspOn, function(v) S.EspOn=v end)
@@ -2593,24 +2599,20 @@ sEsp.toggle("ซ่อนไอเท็มของเพื่อนร่ว�
 sEsp.slider("ระยะที่เห็นรูปอาวุธ", 50, 1000, 25, S.ItemDist, function(v) S.ItemDist=v end)
 sEsp.toggle("แสดงกล่อง", S.EspBox, function(v) S.EspBox=v end)
 sEsp.toggle("แสดงเพื่อนทีม (สีจาง)", S.EspTeam, function(v) S.EspTeam=v end)
-sEsp.toggle("ตำรวจ: ★ ผู้ต้องหา (สีตามระดับหมายจับ)", S.WantedEsp, function(v) S.WantedEsp=v end)
+-- ซ่อนจากเมนู: สวิตช์ "ตำรวจ ★ ผู้ต้องหา" (ตัวทำงานยังอยู่ ค่าตรึงที่หัวไฟล์)
 sEsp.slider("ขนาดตัวอักษร", 11, 34, 1, S.EspTextSize, function(v) S.EspTextSize=v end)
 sEsp.slider("ระยะ ESP", 100, 3000, 50, S.EspDist, function(v) S.EspDist=v end)
 sEsp.slider("อัตราวาด (ต่ำ = fps สูง)", 10, 60, 5, S.EspHz, function(v) S.EspHz=v end)
-
-local sPt = Section("📍 จุดสำคัญ")
-sPt.toggle("ESP จุดขายยา (SELL DRUG / DEALER)", S.PointDrug, function(v) S.PointDrug=v end)
-sPt.toggle("ESP ร้านค้ามืด (BLACK MARKET)", S.PointShop, function(v) S.PointShop=v end)
-sPt.slider("ขนาดตัวอักษร", 12, 36, 1, S.PointTextSize, function(v) S.PointTextSize=v end)
-local pLabel = sPt.label("จุดที่เจอ: ...")
-sPt.button("สแกนใหม่", function() pLabel.set("จุดที่เจอ: "..scanPoints()) end)
-sPt.label("อยู่นอกจอจะมีลูกศร < ที่ขอบจอ")
+-- จุดสำคัญ (ย้ายมารวมในแท็บ ESP ผู้เล่น: ใช้ sEsp เดียวกัน ไม่มีแท็บ "จุดสำคัญ" แยกแล้ว)
+sEsp.toggle("ESP จุดขายยา (SELL DRUG / DEALER)", S.PointDrug, function(v) S.PointDrug=v end)
+sEsp.toggle("ESP ร้านค้ามืด (BLACK MARKET)", S.PointShop, function(v) S.PointShop=v end)
+sEsp.slider("ขนาดตัวอักษรจุดสำคัญ", 12, 36, 1, S.PointTextSize, function(v) S.PointTextSize=v end)
+local pLabel = sEsp.label("จุดที่เจอ: ...")
+sEsp.button("สแกนใหม่", function() pLabel.set("จุดที่เจอ: "..scanPoints()) end)
+sEsp.label("อยู่นอกจอจะมีลูกศร < ที่ขอบจอ")
 
 local sGun = Section("🔫 ปืน")
-sGun.toggle("กระสุนเกาะกลุ่ม", S.NoSpread, function(v) S.NoSpread=v end)
-sGun.toggle("ไม่ร้อน", S.NoHeat, function(v) S.NoHeat=v end)
-sGun.toggle("ไม่มีรีคอยล์", S.NoRecoil, function(v) S.NoRecoil=v end)
-sGun.toggle("ตัดเสียงรีโหลด", S.MuteReload, function(v) S.MuteReload=v end)
+-- ซ่อนจากเมนู 4 อัน: กระสุนเกาะกลุ่ม / ไม่ร้อน / ไม่มีรีคอยล์ / ตัดเสียงรีโหลด (ตัวทำงานยังอยู่ ค่าตรึงที่หัวไฟล์)
 -- โปรไฟล์ปืนที่ถืออยู่ (อัปเดตอัตโนมัติทุก 1 วิ) + ตั้งระยะยิงที่เชื่อถือได้เฉพาะปืนกระบอกนี้
 local gunInfo = sGun.label("ปืนที่ถืออยู่: ...")
 task.spawn(function()
@@ -2623,37 +2625,8 @@ task.spawn(function()
 		task.wait(1)
 	end
 end)
-sGun.slider("ระยะเชื่อถือได้ ของปืนที่ถืออยู่ (0 = อัตโนมัติ)", 0, 600, 10, 0, function(v)
-	local n = ball.name
-	if not n then return end
-	S.GunRange = S.GunRange or {}
-	S.GunRange[n] = v > 0 and v or nil
-end)
-sGun.toggle("ฟันมีดเร็วขึ้น", S.MeleeFast, function(v) S.MeleeFast=v end)
-sGun.slider("ฟันเร็วขึ้น % (0 = ปกติ, สูงสุด 50)", 0, 50, 5, math.clamp(S.MeleePct or 0, 0, 50), function(v)
-	S.MeleePct = math.clamp(v, 0, 50)
-	if getgenv().SuiteSweep then pcall(getgenv().SuiteSweep) end   -- ใช้ค่าใหม่ทันที
-end)
-sGun.toggle("ปรับความรัวอัตโนมัติ (ถอยเมื่อเล็งตรงแต่พลาด)", S.AutoRate, function(v)
-	S.AutoRate = v
-	if not v then getgenv().SuiteMulNow = S.FireMul if getgenv().SuiteSweep then pcall(getgenv().SuiteSweep) end end
-end)
-sGun.toggle("โยกตัวลวงคนยิง (เปิดตลอด ไม่พัก) ⚠ เสี่ยงโดนเตะ", S.Jitter, function(v) S.Jitter = v log("jitter " .. tostring(v) .. " amp=" .. tostring(S.JitterAmp)) end)
-sGun.slider("แรงโยกตอนยืน (studs) 3 = ค่าเริ่ม, 15 = สุด", 0.5, 15, 0.5, S.JitterAmp or 2, function(v) S.JitterAmp = v end)
-sGun.slider("แรงโยกตอนเดิน (studs) ลดถ้าโดนดึงกลับ", 0, 3, 0.25, S.JitterWalk or 0.7, function(v) S.JitterWalk = v end)
-sGun.toggle("หลบกระสุนที่เล็งมา (เปิดพร้อมโยกได้) ⚠ เสี่ยงโดนเตะ", S.Dodge, function(v) S.Dodge = v log("dodge " .. tostring(v) .. " amp=" .. tostring(S.DodgeAmp)) end)
-sGun.slider("ระยะหลบ (studs) 8 = ค่าเริ่ม, 20 = สุด", 1, 20, 1, S.DodgeAmp or 8, function(v) S.DodgeAmp = v end)
-sGun.toggle("ขยับหลบตอนล้มรอตาย (แบบแลคกระตุก วาร์ปสั้น ๆ) ⚠ เสี่ยงโดนเตะ", S.DownedDodge ~= false, function(v) S.DownedDodge = v end)
-sGun.toggle("ท่าแลคกระตุกตอนปกติด้วย (วาร์ปสั้น ๆ นิ่งสลับ) ⚠ เสี่ยงโดนเตะ", S.LagStyle, function(v) S.LagStyle = v end)
-sGun.slider("ระยะวาร์ปแลคตอนปกติ (studs) 1.5 = ค่าเริ่ม", 0.5, 6, 0.25, S.LagStyleAmp or 1.5, function(v) S.LagStyleAmp = v end)
-sGun.slider("ระยะขยับตอนล้ม (studs) 1.2 = ค่าเริ่ม", 0.5, 6, 0.25, S.DownedAmp or 1.2, function(v) S.DownedAmp = v end)
-sGun.slider("ระยะหลบตอนเดิน (studs) ลดถ้าโดนดึงกลับ", 0, 20, 1, S.DodgeWalk or 4, function(v) S.DodgeWalk = v end)
-sGun.slider("หลบเมื่อกระสุนผ่านใกล้กว่า (studs)", 1, 15, 0.5, S.DodgeRadius or 6, function(v) S.DodgeRadius = v end)
-sGun.toggle("หน่วงตัวละคร (คนอื่นเห็นเราช้ากว่าจริง) ⚠ เสี่ยงโดนเตะ", S.Lag, function(v) S.Lag = v log("lag " .. tostring(v) .. " t=" .. tostring(S.LagTime)) end)
-sGun.slider("หน่วงกี่วิ (0.15 = ค่าเริ่ม, สูงสุด 1.2)", 0.05, 1.2, 0.05, S.LagTime or 0.15, function(v) S.LagTime = v end)
-sGun.toggle("ลดโยก + ปิดหลบ/หน่วง ชั่วคราวตอนต่อย-ยิง (ให้ตีโดน)", S.AtkSuspend ~= false, function(v) S.AtkSuspend = v end)
-sGun.slider("ช่วงลดโยกหลังคลิก (วิ)", 0.1, 1, 0.05, S.AtkWin or 0.35, function(v) S.AtkWin = v end)
-sGun.slider("แรงโยกตอนตี/ยิง (studs) 0 = นิ่งเลย", 0, 3, 0.25, S.AtkJitter or 1.2, function(v) S.AtkJitter = v end)
+-- ซ่อนจากเมนู (ตัวทำงานยังอยู่ ค่าตรึงที่หัวไฟล์): ระยะเชื่อถือได้ของปืน (อัตโนมัติ) / ฟันมีดเร็วขึ้น + สไลเดอร์ % / ปรับความรัวอัตโนมัติ
+-- ย้ายไปแท็บ 🏃 ตัวละคร: โยกตัวลวง / หลบกระสุน / ขยับตอนล้ม / หน่วงตัวละคร / ลดโยกตอนต่อย-ยิง (ดูท้าย sChar)
 sGun.slider("ชดเชยดีเลย์เป้า (วิ) 0 = ปิด", 0, 0.2, 0.02, S.LatComp or 0, function(v) S.LatComp = v end)
 sGun.slider("ความเร็วกระสุน × (1 = ปกติ, ทดสอบเป้านิ่งก่อน)", 1, 10, 1, math.clamp(S.BulletMul or 1, 1, 10), function(v)
 	S.BulletMul = v
@@ -3150,34 +3123,24 @@ sChar.toggle("⚠ Noclip (เสี่ยงโดนเตะ เปิดเ�
 sChar.slider("ความเร็วบวกเพิ่ม (รวมไม่เกิน " .. SpeedCap .. " | เดิน 8, วิ่ง 18)", 0, SpeedMax, 1, math.min(S.SpeedBonus, SpeedMax), function(v)
 	S.SpeedBonus=v if getgenv().SuiteSetSpeed then getgenv().SuiteSetSpeed() end
 end)
+-- ย้ายมาจากแท็บปืน: ฟังก์ชันที่ขยับ/หน่วงตำแหน่งตัวละครที่ส่งออก
+sChar.toggle("โยกตัวลวงคนยิง (เปิดตลอด ไม่พัก) ⚠ เสี่ยงโดนเตะ", S.Jitter, function(v) S.Jitter = v log("jitter " .. tostring(v) .. " amp=" .. tostring(S.JitterAmp)) end)
+sChar.slider("แรงโยกตอนยืน (studs) 3 = ค่าเริ่ม, 15 = สุด", 0.5, 15, 0.5, S.JitterAmp or 2, function(v) S.JitterAmp = v end)
+sChar.slider("แรงโยกตอนเดิน (studs) ลดถ้าโดนดึงกลับ", 0, 3, 0.25, S.JitterWalk or 0.7, function(v) S.JitterWalk = v end)
+sChar.toggle("หลบกระสุนที่เล็งมา (เปิดพร้อมโยกได้) ⚠ เสี่ยงโดนเตะ", S.Dodge, function(v) S.Dodge = v log("dodge " .. tostring(v) .. " amp=" .. tostring(S.DodgeAmp)) end)
+sChar.slider("ระยะหลบ (studs) 8 = ค่าเริ่ม, 20 = สุด", 1, 20, 1, S.DodgeAmp or 8, function(v) S.DodgeAmp = v end)
+sChar.toggle("ขยับหลบตอนล้มรอตาย (แบบแลคกระตุก วาร์ปสั้น ๆ) ⚠ เสี่ยงโดนเตะ", S.DownedDodge ~= false, function(v) S.DownedDodge = v end)
+-- ลบออก: ท่าแลคกระตุกตอนปกติ (สวิตช์ + สไลเดอร์ระยะ) — ตรึง LagStyle = ปิดที่หัวไฟล์
+sChar.slider("ระยะขยับตอนล้ม (studs) 1.2 = ค่าเริ่ม", 0.5, 6, 0.25, S.DownedAmp or 1.2, function(v) S.DownedAmp = v end)
+sChar.slider("ระยะหลบตอนเดิน (studs) ลดถ้าโดนดึงกลับ", 0, 20, 1, S.DodgeWalk or 4, function(v) S.DodgeWalk = v end)
+sChar.slider("หลบเมื่อกระสุนผ่านใกล้กว่า (studs)", 1, 15, 0.5, S.DodgeRadius or 6, function(v) S.DodgeRadius = v end)
+sChar.toggle("หน่วงตัวละคร (คนอื่นเห็นเราช้ากว่าจริง) ⚠ เสี่ยงโดนเตะ", S.Lag, function(v) S.Lag = v log("lag " .. tostring(v) .. " t=" .. tostring(S.LagTime)) end)
+sChar.slider("หน่วงกี่วิ (0.15 = ค่าเริ่ม, สูงสุด 1.2)", 0.05, 1.2, 0.05, S.LagTime or 0.15, function(v) S.LagTime = v end)
+sChar.toggle("ลดโยก + ปิดหลบ/หน่วง ชั่วคราวตอนต่อย-ยิง (ให้ตีโดน)", S.AtkSuspend ~= false, function(v) S.AtkSuspend = v end)
+sChar.slider("ช่วงลดโยกหลังคลิก (วิ)", 0.1, 1, 0.05, S.AtkWin or 0.35, function(v) S.AtkWin = v end)
+sChar.slider("แรงโยกตอนตี/ยิง (studs) 0 = นิ่งเลย", 0, 3, 0.25, S.AtkJitter or 1.2, function(v) S.AtkJitter = v end)
 
-local sBag = Section("🎒 กระเป๋า")
-sBag.label("ของในกระเป๋ารอดตอนตาย/โดนยิง (ของในตัวหลุด) = ระบบเกมเอง")
-local bagStat = sBag.label("กระเป๋า: ...")
-local bagList = sBag.label("")
-sBag.button("เปิดกระเป๋า หยิบปืน  (คีย์ B)", function() openBag() end)
-sBag.label("มือถือ: แตะปุ่ม 🎒 มุมจอขวา")
-task.spawn(function()
-	while live() do
-		local d = getgenv().BagData
-		if type(d) == "table" then
-			bagStat.set(string.format("ใช้ %s/%s ช่อง | สวม: %s | ตาย: %s",
-				tostring(d.usedSlots or "?"), tostring(d.maxSlots or "?"),
-				d.equipped and "ใช่" or "ไม่", d.isDead and "ใช่" or "ไม่"))
-			local guns = {}
-			if type(d.items) == "table" then
-				for _, it in ipairs(d.items) do
-					if type(it) == "table" and it.name and it.itemType == "Tool" then guns[#guns+1] = it.name end
-				end
-			end
-			bagList.set("ปืน/ของถือได้: " .. (#guns > 0 and table.concat(guns, ", ") or "-"))
-		else
-			bagStat.set("ยังไม่มีข้อมูล — เปิดกระเป๋า 1 ครั้งให้เกม sync")
-			bagList.set("")
-		end
-		task.wait(1)
-	end
-end)
+-- แท็บ 🎒 กระเป๋า ถูกลบตามสั่ง (คีย์ B และปุ่ม 🎒 บนมือถือยังเปิดกระเป๋าได้ตามปกติ)
 
 local sAuto = Section("🌾 ออโต้ฟราม")
 local function setAutoTrash(v)
@@ -3242,34 +3205,6 @@ do
 	end)
 end
 
-local sEv = Section("⏱️ อีเวนต์")
-local evL = { sEv.label("..."), sEv.label("..."), sEv.label("..."), sEv.label("...") }
-sEv.label("━━ อีเวนต์ทั้งหมด (หมุนเวียนทุก 2 ชม. ทีละอัน) ━━")
--- ลิสต์อีเวนต์ครบทุกอันจาก EventConfig + ไฮไลต์ตัวที่กำลังเกิด
-local catL = {}
-do
-	local cat = getgenv().EventCatalog or {}
-	for i = 1, math.max(#cat, 8) do catL[i] = sEv.label("") end
-end
-sEv.label("อัปเดตทุก 1 วิ — อ่านจาก HUD/เซิร์ฟตรง ๆ")
-task.spawn(function()
-	while live() do
-		local lines = eventLines()
-		for i,l in ipairs(evL) do pcall(function() l.set(lines[i] or "") end) end
-		-- หาตัวที่ active จากชื่อใน Pill (pillRead อยู่ในบรรทัดแรกของ lines)
-		local activeTxt = (lines[1] or "")
-		local cat = getgenv().EventCatalog or {}
-		for i, lbl in ipairs(catL) do
-			local e = cat[i]
-			if e then
-				local on = activeTxt:find(e.name, 1, true) ~= nil
-				pcall(function() lbl.set((on and "▶ " or "• ") .. e.name .. (on and "  ← กำลังเกิด" or "")) end)
-			else pcall(function() lbl.set("") end) end
-		end
-		task.wait(1)
-	end
-end)
-
 local sFps = Section("⚡ FPS")
 local function setLowGfx(v)
 	S.LowGfx = v
@@ -3317,6 +3252,35 @@ task.spawn(function()
 		task.wait(1)
 	end
 end)
+
+-- ⏱️ อีเวนต์: รวมเข้าแท็บ FPS (ไม่มีแท็บอีเวนต์แยกแล้ว)
+local evL = { sFps.label("..."), sFps.label("..."), sFps.label("..."), sFps.label("...") }
+sFps.label("━━ อีเวนต์ทั้งหมด (หมุนเวียนทุก 2 ชม. ทีละอัน) ━━")
+-- ลิสต์อีเวนต์ครบทุกอันจาก EventConfig + ไฮไลต์ตัวที่กำลังเกิด
+local catL = {}
+do
+	local cat = getgenv().EventCatalog or {}
+	for i = 1, math.max(#cat, 8) do catL[i] = sFps.label("") end
+end
+sFps.label("อัปเดตทุก 1 วิ — อ่านจาก HUD/เซิร์ฟตรง ๆ")
+task.spawn(function()
+	while live() do
+		local lines = eventLines()
+		for i,l in ipairs(evL) do pcall(function() l.set(lines[i] or "") end) end
+		-- หาตัวที่ active จากชื่อใน Pill (pillRead อยู่ในบรรทัดแรกของ lines)
+		local activeTxt = (lines[1] or "")
+		local cat = getgenv().EventCatalog or {}
+		for i, lbl in ipairs(catL) do
+			local e = cat[i]
+			if e then
+				local on = activeTxt:find(e.name, 1, true) ~= nil
+				pcall(function() lbl.set((on and "▶ " or "• ") .. e.name .. (on and "  ← กำลังเกิด" or "")) end)
+			else pcall(function() lbl.set("") end) end
+		end
+		task.wait(1)
+	end
+end)
+
 
 UIS.InputBegan:Connect(function(i,gp)
 	if gp or not live() then return end
