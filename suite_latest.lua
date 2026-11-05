@@ -1151,7 +1151,7 @@ local function mkE(pl)
 		e["s" .. i] = s
 	end
 	for i = 1, 8 do
-		local m = Drawing.new("Line"); m.Thickness, m.Transparency = 1.6, 1
+		local m = Drawing.new("Line"); m.Thickness, m.Transparency = UIS.TouchEnabled and 2.5 or 1.6, 1
 		e["m" .. i] = m
 	end
 	e.hpBg = Drawing.new("Square"); e.hpBg.Filled, e.hpBg.Color, e.hpBg.Transparency = true, Color3.new(), 0.65
@@ -1182,7 +1182,8 @@ local function drawEsp()
 					local bot, v2 = cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 					if not (v1 or v2) then hideE(e)
 					else
-						local h = math.abs(bot.Y - top.Y)
+						-- จอสัมผัส: คนไกลหดเหลือกรอบ ~10px ตัวหนังสือ 8px = บนจอมือถือแทบมองไม่เห็น (ดูเหมือน "ต้องเข้าใกล้ถึงจะขึ้น") → ตั้งขนาดต่ำสุดให้เห็นได้
+						local h = math.max(math.abs(bot.Y - top.Y), UIS.TouchEnabled and 30 or 0)
 						local w = h * 0.52
 						local x, y = top.X - w * 0.5, top.Y
 						local col = pl.Team and pl.Team.TeamColor.Color or Color3.new(1,1,1)
@@ -1214,7 +1215,7 @@ local function drawEsp()
 						end
 						e.hpBg.Visible, e.hp.Visible = S.EspBox, S.EspBox
 						-- ตัวหนังสือเล็กลงตามระยะ กันซ้อนทับตอนคนเยอะ
-						local ts = math.clamp(S.EspTextSize - dist / 140, 10, S.EspTextSize)
+						local ts = math.clamp(S.EspTextSize - dist / 140, UIS.TouchEnabled and 15 or 10, math.max(S.EspTextSize, UIS.TouchEnabled and 16 or 0))
 						e.name.Size, e.info.Size = ts, ts - 2
 						e.name.Text, e.name.Color = ((wl > 0 and S.WantedEsp) and ("★" .. wl .. " ") or "") .. (pl.DisplayName:find("[\128-\255]") and pl.Name or pl.DisplayName), col  -- ลีดเดอร์บอร์ดโชว์ DisplayName | Drawing วาดตัวอักษรไทยไม่ได้ (ขึ้น ???) เลยถอยไปใช้ชื่อบัญชีถ้ามีตัวไทย
 						e.name.Position = Vector2.new(top.X, y - (ts + 5))
