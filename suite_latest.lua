@@ -2263,8 +2263,7 @@ local sgui = Instance.new("ScreenGui")
 sgui.Name="SailueatUI"; sgui.ResetOnSpawn=false; sgui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; sgui.IgnoreGuiInset=true
 -- มือถือ/iOS (ไม่มีคีย์บอร์ด): CoreGui มักไม่แสดง → ใช้ PlayerGui | คอมใช้ CoreGui เหมือนเดิม
 -- ตัวรันมือถือส่วนใหญ่มี gethui() (โฟลเดอร์ที่ GUI แสดงจริง) ใช้ก่อน | ไม่มีค่อยใช้ CoreGui (คอม) / PlayerGui (มือถือ)
-local okH, hui = pcall(function() return gethui and gethui() end)
-if okH and hui then pcall(function() sgui.Parent = hui end) end
+pcall(function() local h = gethui and gethui() if h then sgui.Parent = h end end)   -- ห้ามประกาศ local ที่ระดับนี้: ฟังก์ชันหลักใกล้เพดาน 200 locals แล้ว
 if not sgui.Parent and not (UIS.TouchEnabled and not UIS.KeyboardEnabled) then pcall(function() sgui.Parent=CoreGui end) end
 if not sgui.Parent then sgui.Parent=lp:WaitForChild("PlayerGui") end
 getgenv().SailueatUI = sgui
