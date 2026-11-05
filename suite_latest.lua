@@ -126,9 +126,11 @@ do
 		end
 
 		-- เขียนค่าลง Instance รอบเดียวต่อเฟรม: ESP เขียนพรอพ ~25 ครั้ง/คน/เฟรม ถ้า apply ทุกครั้งที่เขียน = หลายพันครั้ง/เฟรม มือถือเฟรมตก
-		-- ponytail: ตารางคิวแบบ dirty flag ถ้าอนาคตต้องให้ภาพตรงเป๊ะทันทีค่อยเรียก apply ตรง ๆ
+		-- ต้องผูกที่ Last+1 ไม่ใช่ RenderStepped: RenderStepped ทำงาน "ก่อน" กล้องอัปเดตและก่อน SuiteLoop (Last=2000) ที่คำนวณตำแหน่ง
+		-- → ภาพที่ได้คือพิกัดของเฟรมที่แล้ว ช้ากว่ากล้อง 1 เฟรม = กรอบ ESP ว่ายไปมา/กระพริบตอนหันจอ (อาการที่เจอบนมือถือ)
 		local dirty = {}
-		game:GetService("RunService").RenderStepped:Connect(function()
+		pcall(function() game:GetService("RunService"):UnbindFromRenderStep("SuiteDrawFlush") end)
+		game:GetService("RunService"):BindToRenderStep("SuiteDrawFlush", Enum.RenderPriority.Last.Value + 1, function()
 			if not next(dirty) then return end
 			for d in pairs(dirty) do
 				dirty[d] = nil
@@ -238,6 +240,9 @@ loadCfg()
 -- ค่าพื้นฐาน (ทดสอบผ่าน): ชักปืน 0.1 | รีโหลด 0.4 (โหลดนัดเดียว 5 รอบผ่าน ที่ 0.2 ก็ผ่านแบบนัดเดียว แต่เต็มแม็กรัวติดกันยังไม่ยืนยัน) | ปรับเองได้ที่สไลเดอร์ ค่าที่ปรับจะถูกจำ
 -- ไฟล์ config เก่าที่จำค่าไว้ก่อนเวอร์ชันนี้ (CfgVer < 2) จะถูกตั้งกลับเป็นค่าพื้นฐานครั้งเดียว หลังจากนั้นค่าที่ปรับเองจะอยู่ถาวร
 if S.CfgVer < 2 then S.CfgVer, S.ReloadMul, S.EquipMul = 2, 0.4, 0.1 end
+-- CfgVer 3: ดัน EspHz จาก 30 เป็น 60 ครั้งเดียว — 30 ครั้ง/วิ บนจอ 60fps = กรอบขยับเฟรมเว้นเฟรม เห็นเป็นกรอบว่ายตามตัวตอนหันจอ (ชัดมากบนมือถือที่ปัดนิ้วหันเร็ว)
+-- ถ้า fps ตก ลดเองได้ที่สไลเดอร์ "อัตราวาด" แล้วค่าที่ลดจะถูกจำ ไม่ถูกดันขึ้นอีก
+if S.CfgVer < 3 then S.CfgVer, S.EspHz = 3, 60 end
 S.ReloadMul, S.EquipMul = math.clamp(S.ReloadMul, 0.2, 1), math.clamp(S.EquipMul, 0.1, 1)
 S.FireMul = math.clamp(S.FireMul, 0.1, 1)   -- ปรับได้จากสไลเดอร์ "ความรัวปืน" ในแท็บปืน
 S.MaxCPS = math.max(S.MaxCPS, 40)   -- 0.4 → 0.6: ปืนช้า (Double Barrel 0.43) เคยถูกเร่งเป็น 0.17 = 2.5 เท่าของปืนจริง
@@ -367,7 +372,8 @@ task.spawn(function()
 end)
 
 --========================= CLEANUP =========================
-for _, n in ipairs({ "SuiteLoop", "PointEsp", "SuiteJitterRS" }) do pcall(function() RS:UnbindFromRenderStep(n) end) end
+-- ห้ามใส่ "SuiteDrawFlush" ตรงนี้: ตัวนั้นถูกผูกไว้แล้วในบล็อกหัวไฟล์ (นอก task.spawn) ซึ่งรันไปก่อนบรรทัดนี้ ใส่แล้วจะปลดทิ้งเอง = Drawing หยุดอัปเดตทั้งหมด
+for _, n in ipairs({ "SuiteLoop", "PointEsp", "SuiteJitterRS", "SuiteItemLoop" }) do pcall(function() RS:UnbindFromRenderStep(n) end) end
 for _, k in ipairs({ "SuiteProp", "SuiteGuiAdd", "SuiteRem", "SuiteStam",
 	"PEAdd", "PERem", "PEAnn", "NWConn", "SpeedConn", "SpeedHumConn", "EvConn", "AfkConn", "StamRespawn", "NoclipConn", "InstPromptConn", "SuiteCrouchConn", "SuiteStatsConn", "AimStatsConn", "SuiteJitterConn", "SuiteDodgeConn", "SuiteGfxConn", "SuitePromptConn" }) do
 	local v = getgenv()[k]
@@ -3025,9 +3031,11 @@ local function refresh(pl, b)
 	for _, t in ipairs(list) do mkTile(b.f, t, t == held) end
 	b.n = #list
 end
-getgenv().SuiteItemConn = RS.RenderStepped:Connect(function()
+-- Last (หลังกล้องอัปเดต) ไม่ใช่ RenderStepped (ก่อนกล้อง): RenderStepped ใช้พิกัดกล้องของเฟรมที่แล้ว แผงของเลยว่ายตามหลังตัวคนตอนหันจอ
+pcall(function() RS:UnbindFromRenderStep("SuiteItemLoop") end)
+RS:BindToRenderStep("SuiteItemLoop", Enum.RenderPriority.Last.Value, function()
 	if not live() then
-		pcall(function() getgenv().SuiteItemConn:Disconnect() end)
+		pcall(function() RS:UnbindFromRenderStep("SuiteItemLoop") end)
 		itemGui:Destroy()
 		return
 	end
