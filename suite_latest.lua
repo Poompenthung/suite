@@ -26,7 +26,7 @@ if Drawing == nil then
 end
 
 -- กล่องสถานะบนจอ
-local _PG = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+local _PG = (function() local ok, h = pcall(function() return gethui and gethui() end) return ok and h or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end)()
 local _sg = Instance.new("ScreenGui")
 _sg.Name, _sg.ResetOnSpawn, _sg.IgnoreGuiInset, _sg.DisplayOrder = "SailueatBoot", false, true, 999
 _sg.Parent = _PG
@@ -2262,7 +2262,10 @@ local function grad(p,a,b,rot) local g=Instance.new("UIGradient",p); g.Color=Col
 local sgui = Instance.new("ScreenGui")
 sgui.Name="SailueatUI"; sgui.ResetOnSpawn=false; sgui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; sgui.IgnoreGuiInset=true
 -- มือถือ/iOS (ไม่มีคีย์บอร์ด): CoreGui มักไม่แสดง → ใช้ PlayerGui | คอมใช้ CoreGui เหมือนเดิม
-if not (UIS.TouchEnabled and not UIS.KeyboardEnabled) then pcall(function() sgui.Parent=CoreGui end) end
+-- ตัวรันมือถือส่วนใหญ่มี gethui() (โฟลเดอร์ที่ GUI แสดงจริง) ใช้ก่อน | ไม่มีค่อยใช้ CoreGui (คอม) / PlayerGui (มือถือ)
+local okH, hui = pcall(function() return gethui and gethui() end)
+if okH and hui then pcall(function() sgui.Parent = hui end) end
+if not sgui.Parent and not (UIS.TouchEnabled and not UIS.KeyboardEnabled) then pcall(function() sgui.Parent=CoreGui end) end
 if not sgui.Parent then sgui.Parent=lp:WaitForChild("PlayerGui") end
 getgenv().SailueatUI = sgui
 
@@ -2919,7 +2922,8 @@ local oldItems = CoreGui:FindFirstChild("SuiteItems") or (lp:FindFirstChild("Pla
 if oldItems then pcall(function() oldItems:Destroy() end) end
 local itemGui = Instance.new("ScreenGui")
 itemGui.Name, itemGui.ResetOnSpawn, itemGui.DisplayOrder, itemGui.IgnoreGuiInset = "SuiteItems", false, 50, true
-pcall(function() itemGui.Parent = CoreGui end)
+pcall(function() local h = gethui and gethui() if h then itemGui.Parent = h end end)
+if not itemGui.Parent and not (UIS.TouchEnabled and not UIS.KeyboardEnabled) then pcall(function() itemGui.Parent = CoreGui end) end
 if not itemGui.Parent then itemGui.Parent = lp.PlayerGui end
 
 local function isWeapon(t)
